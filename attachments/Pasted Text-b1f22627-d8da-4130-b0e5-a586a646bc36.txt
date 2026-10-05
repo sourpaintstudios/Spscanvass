@@ -1,0 +1,315 @@
+SOUR PAINT STUDIO CANVAS — MASTER BRIEF (FINAL)
+Consolidated: base model + Gemini + Meta + GPT musical gesture layer + Claude addenda,
+with Grok corrections applied.
+For the build chat: this is the spec. Add only. Do not replace the fluid model with a
+note-to-color chart. Do not reopen rejected items in section 16.
+
+================================================================================
+1. THE APP (LOCKED)
+================================================================================
+Name: Sour Paint Studio Canvas
+Platform: phone, portrait, iOS/Android.
+The player plays guitar. Singing is allowed. The phone mic listens. The app paints
+in real time. The painting is also the video of that performance. The player watches
+the picture form while they play.
+No menu. No brush picker. No color picker. Music is the only input.
+
+================================================================================
+2. THE PROBLEM (LOCKED)
+================================================================================
+Literal lookup rules ("if it hears G, use this color") produce mechanical, dead output.
+The fix is not better rules. The fix is physics. The canvas has its own life.
+The music nudges it. It does not draw what it hears.
+A visualizer (one visual event per detected note) is a failure.
+
+================================================================================
+3. CORE MODEL (LOCKED)
+================================================================================
+Canvas is a fluid simulation. Paint is pigment in a medium. It flows, pools, bleeds,
+and dries on its own. Music applies forces. The same riff twice never paints the same
+thing, because pigment from the first pass is still moving when the second hits.
+
+Music to behavior:
+- Sustained note = slow current dragging pigment
+- Fast run = turbulence
+- Chord = splash that radiates
+- Silence = drying: settle, soften, optional craze cracks after a long silence
+
+Feature to force:
+- Pitch class = which pigment family gets stirred. Never a fixed RGB.
+- Octave = stroke weight. Low = thick and broad. High = thin and narrow.
+- Amplitude = force magnitude and pressure
+- Tempo = churn rate and advection speed
+- Chord quality = viscosity and complement bias
+- Key change = movement reset and new dominant hue, no hard color swap
+- Mood = slow independent state. See section 8.
+
+================================================================================
+4. PIPELINE (LOCKED)
+================================================================================
+STAGE 1 — DETECT
+Mic to AudioWorklet. Not ScriptProcessorNode.
+Per frame: f0 (YIN or MPM), RMS amplitude, spectral centroid, chroma vector, onset.
+Derive pitch class 0–11, octave normalized, chord quality, tempo.
+5-frame median on f0. Reject pitch jumps greater than 12 semitones in under 100 ms.
+50 ms exponential moving average on RMS before mapping.
+Max RMS jump per frame: 0.30. Clamp harder jumps.
+AGC artifact: if RMS jumps more than 0.5 in under 80 ms with no onset, discard that
+frame's amplitude and hold the previous valid value.
+This is the only place audio is understood.
+
+STAGE 2 — INTERPRET
+Detected values become forces. See section 6. Deterministic.
+
+STAGE 3 — SIMULATE
+Grid of velocity (x, y), pigment density, water, height.
+Semi-Lagrangian advection. 1 Jacobi diffusion pass on the live path. 2 only if the
+phone holds frame budget. Not 3. No full Navier-Stokes solver.
+Fluid has memory.
+
+STAGE 4 — RENDER
+Density to color and opacity. Height to normal map. Raking light from upper left, 30 degrees.
+Video is the frame sequence. Stages 3–4 are chaotic because of memory.
+
+================================================================================
+5. GEMINI ADDITIONS (LOCKED)
+================================================================================
+5.1 DYNAMIC IMPASTO
+Height field is part of the simulation, not decoration.
+High amplitude deposits body, not just color.
+Hard strum = ridge. Sustained low note = plateau. Fast run = broken ridges.
+Soft playing and silence deposit no new body. Ridges settle.
+On screen: fake 3D via normal map. Paint stands up when the player digs in.
+Height blocks flow. Ridges are barriers. This is canvas memory.
+
+5.2 CHROMATIC DARK MIXING
+Hard ban on pure black #000000 and flat achromatic dark.
+Darks only from unequal complementary pairs: blue/orange, red/green, yellow/violet.
+Never 50/50. Dark must stay biased: blue-black, orange-brown, still readable as the hue.
+Complement taken from pigment already nearby, not a fixed lookup.
+Shadow under a ridge is a complementary mix of that stroke.
+Complement ratio clamp 0.42 max. Above that is mud.
+
+================================================================================
+6. PARAMETER MAPPING TABLE (LOCKED)
+================================================================================
+SESSION
+3-second mic calibration, then normalize. Guitar range clamped E2–E6.
+No hard musical thresholds.
+
+PER-FRAME INPUTS
+f0 = fundamental Hz
+pc = pitch class 0–11
+oct = 0.0–1.0 across E2–E6
+amp_norm = RMS / (rolling 95th percentile + epsilon), slow AGC
+centroid = spectral brightness 0–1
+chord_val = {major: 0.0, ambiguous: 0.3, dom7: 0.5, minor: 1.0} * chord_confidence
+onset = transient strength 0–1
+churn = tempo mapped 40 bpm to 0.1, 200 bpm to 2.0, clamped 0.1–2.0
+silence = amp_norm < 0.08 for more than 300 ms
+voice_active = see section 9
+
+MAPPING
+amp_norm to force = amp_norm * (0.4 + 0.6 * onset). Do not use an unbounded 0–2.5 curve.
+amp_norm to height deposit only if amp_norm > 0.45. Rate = (amp_norm - 0.45) * 1.8 per frame, along velocity. Below 0.45, height does not grow. Color still deposits.
+amp_norm to ridge width 2–20 px, linear, sim pixels.
+oct to kernel width = 14 - 13 * oct, clamp 1–14 sim px. Low = wide. High = narrow.
+f0 to stroke weight, log scale, clamp 1–12 sim px. Low = heavy.
+pc to hue family, 30 degree steps. Jitter from mood, cap plus or minus 12 degrees. Not plus or minus 20.
+centroid to saturation 0.30–0.90, linear, clamped. Does not override pitch class. May nudge temperature toward the warmer or cooler neighbor.
+chord_val to viscosity: 0 thin, 1 thick. major 0, ambiguous and dom7 about 0.5, minor 1. Low confidence falls back toward 0.3. Do not use the 0.70–1.30 scale.
+chord_val to complement ratio = clamp(chord_val * 0.42, 0.05, 0.42). Major about 0.05–0.12. Minor 0.28–0.42. Never 0.50.
+churn to advection speed multiplier, direct, 0.1–2.0.
+onset > 0.55 to one splash. Radius = onset * 80 sim px, minimum 20. One per onset.
+silence to drying rate ramp 0.01 to 0.20 per frame over 4.5 s. Snap back on any onset. No new pigment. No new height. Diffusion halved. Height edges blur.
+
+COMPLEMENT FORMULA
+complement_hue = (local_hue + 180) mod 360
+complement_ratio = clamp(chord_val * 0.42, 0.05, 0.42)
+dark_hue = lerp(local_hue, complement_hue, complement_ratio)
+dark_L = target_L * 1.15
+Never (0,0,0).
+
+CLAMPS
+Value floor 0.12. Under that, add complement, not black.
+Saturation floor 0.18 on any dark. A gray dark is rejected and remixed with 10 percent more local hue.
+Height cap 1.0. Above that, deposit smears sideways.
+Luminance floor: if canvas average luminance < 0.08 for 3 seconds, inject 0.03 * family L into all cells. Only global brightness override.
+AGC epsilon always on. First 3 seconds use a default 95th percentile.
+
+DYNAMICS BANDS
+amp_norm < 0.35: watercolor. Thin, transparent, fine, small. Height stays 0. Color still deposits.
+0.35–0.65: oil/ink. More saturation, broader gesture, little body.
+> 0.65: impasto, splash, large stroke. Uses the height rule.
+
+================================================================================
+7. GESTURE HOLDER (LOCKED) — BUILD THIS FIRST
+================================================================================
+Gestures are musical. Not taps, pinches, swipes, or phone shake. Touch sculpting is out.
+Music is the only input.
+
+One active gesture. A phrase is one stroke. Notes inside the phrase extend it.
+No per-note dots.
+
+STATE
+active: bool
+trail: array of {x, y, t, amp, f0, onset}
+hue: degrees
+family: 0–11
+started_at: timestamp
+last_onset: timestamp
+
+RULES
+- Single note = one small brush gesture
+- Rapid picking = connected marks on the same gesture
+- Slow bend (f0 glide) = active stroke curves
+- Vibrato (f0 wobble, period under 200 ms, depth over 3 percent) = stroke wiggles
+- Sustained note = extend the stroke. Do not start a new mark. Paint keeps flowing.
+- Big strum (onset high, amp high, chord) = one large movement
+- Chord held = no new stroke. Existing paint bleeds, blends, and expands for the hold.
+- Silence = nothing new. Drying only.
+Phrase end = silence over 300 ms, or a new onset after a hold. Commit the trail. Next note may open a new gesture.
+
+TRAIL TO FORCE
+Each trail sample is a force, not a dot.
+Position is territory, not a Y coordinate. Low octaves bias the lower third. High octaves bias the upper third. Mid sits center.
+Direction follows the velocity field. The trail seeds where the stroke starts. The fluid carries it.
+Magnitude uses the locked force formula.
+Color deposits along the trail. Height deposits only under the height rule.
+
+COMMIT
+On phrase end the trail becomes a permanent pigment deposit. The fluid keeps advecting it.
+
+TEST
+Play E–G–C–G–E as one phrase. Expect one woven stroke across three territories, not five dots.
+Play it again. Different result, because the fluid has memory.
+
+================================================================================
+8. MOOD (LOCKED)
+================================================================================
+mood = (warmth, energy), both 0.05–0.95. Start (0.5, 0.5).
+warmth 0 = cool, 1 = warm.
+energy 0 = slow, wet, saturated. 1 = fast, broken, lighter.
+
+Modulates:
+Hue tilt capped at plus or minus 12 degrees, inside the pitch-class band.
+Drying: high energy adds 0.04 per frame.
+Advection: energy * 0.8 added to churn.
+Impasto settle: low energy height * 0.999 per frame. High energy height * 0.997.
+Saturation: warmth 0 pulls floor toward 0.4. Warmth 1 lifts ceiling toward 0.95.
+
+Update per frame:
+target_warmth = minor 0.2, major 0.8, dom7 0.6, ambiguous 0.5, plus centroid * 0.1
+target_energy = churn / 2
+decay = 0.994
+mood = lerp(mood, target, 1 - decay)
+Add gaussian noise 0.008 per axis. Clamp 0.05–0.95.
+Key change: lerp 40 percent toward (0.5, 0.5), then resume inertia.
+
+================================================================================
+9. VOCAL LAYER (LOCKED)
+================================================================================
+Detect voice with HNR over 15 dB, formant cluster 500–3000 Hz, sustain envelope vs guitar decay.
+voice_active boolean, 80 ms hysteresis. No ML.
+Voice never deposits height.
+Voice never sets force direction. No curl. Guitar owns the velocity field.
+Voice: kernel width * 2.5, splash suppressed except consonant micro-splash at 0.3 radius,
+optional formant hue shift plus or minus 8 degrees inside the current family.
+Simultaneous: guitar drives velocity. Voice wash at 40 percent alpha, saturation cap 0.55, same family.
+If both have pitch, the louder source wins the family. Do not average them.
+
+================================================================================
+10. SESSION PALETTE (LOCKED)
+================================================================================
+Ground: first 30 seconds, modal pitch class and chord quality. After calibration, deposit once at 0.12 alpha as a soft bloom. Never recalculate. No warm/cool picker.
+
+Key-relative spacing, not a hex chart. Root hue drifts with mood.
+fifth +60, fourth +45, major third +30, minor third -30, tritone +150, others interpolate.
+If key confidence is low, skip this and use pitch-class families only.
+
+Palette memory: last 120 seconds of deposited hue centers. Bias current stroke 15 percent toward the most-used. Last 30 seconds weighted 3x.
+
+Key method: Krumhansl-style correlation on a 30 second chroma histogram. Confidence = best minus second best. If confidence < 0.15, skip key-relative mapping. Open tunings fail safe. Root may update after 30 seconds if confidence rises; relationships lerp over 3 seconds. Ground does not recalculate.
+
+Tempo method: median inter-onset interval of the last 8 onsets. Ignore gaps over 2 seconds. Churn smoothed over 300 ms. Rubato does not retarget every late note.
+
+================================================================================
+11. PHONE REAL-TIME (LOCKED)
+================================================================================
+Sim grid 270x480 float16. Render 1080x1920. Not 256x256. High end may use 360x640. Floor 180x320. Never simulate at 1080x1920.
+Upscale bicubic. Build normals at sim res, bicubic the normal map, then 1 px unsharp on normals only, amount 0.35. Do not sharpen color. Raking light after that.
+Textures: velocity RG16f, pigment RGBA (RGB density, A water), height R16f.
+Audio thread: 512 samples at 48 kHz. Pitch on audio thread. Ring buffer to render thread.
+Budget: if 60 fps cannot hold, run live at 30 fps. Audio still analyzed every hop.
+Allocate buffers at init. Nothing allocated inside the frame loop.
+Pre-warm 12 pigment families into a 3D LUT. Sample the LUT.
+
+================================================================================
+12. FAILURE MODES (LOCKED)
+================================================================================
+Mud: per-pixel mix_count. If more than 6 mixes in under 5 seconds, force complement_ratio 0.02 and inject clean water. Also saturation decay: pigment older than 8 seconds loses 0.015 saturation per frame, floor 0.30. Hue unchanged.
+Black holes: if luminance under 0.15, dark = lerp(dark, base * 1.3, 0.5).
+Strobe: global force budget per second. Scale new forces when over.
+Empty canvas on fingerpicking: always deposit color even if height is 0. Minimum flow Perlin * 0.2 at low amp.
+Latency: onset and amp drive force immediately. Pitch and chord may lag 100 ms.
+Mic picks speaker: vocal band split. 80–800 Hz guitar driver. 800–4000 Hz voice texture.
+Stuck silence pools: gravity drift 0.008 per frame downward during silence only. Clears on onset.
+Flat soft passage: if luminance stddev under 0.05 for 6 seconds, next onset force times 1.8, once.
+Bad octave: 5-frame median, reject 12-semitone jumps, hold last valid pitch class.
+
+================================================================================
+13. EXTRA PAINTERLY BEHAVIORS (LOCKED)
+================================================================================
+Edge bloom / backrun: water > 0.6 and velocity < 0.1 and divergence < -0.2. Spawn ring, center density * 0.9, push outward 2x. Loud to soft.
+Granulation: tag ultramarine, burnt sienna, cerulean, raw umber. If viscosity > 0.08 and velocity < 0.2, multiply density by paper bump. Also, velocity under 0.08: 4 percent chance per cell to move 15 percent density to densest neighbor.
+Sustained-pitch bloom: one pitch class over 60 percent of readings for 2 seconds. Radial wash alpha 0.12. No height.
+Edge bleed: 0.018 density per frame along density gradient. If height gradient > 0.3, bleed drops to 0.004. Ridges stay hard.
+Ghost layer: every 30 seconds of active play, composite pigment at 5 percent under new paint. Export toggle default off.
+Craze: only after 10 seconds of silence, on height > 0.4, chromatic dark at complement 0.35–0.40, 1–2 px. Not at 1.5 seconds.
+Late soft smear: if amp_norm < 0.15 after a peak over 0.7 in the last 8 seconds, and average height > 0.25, smear existing height at 30 percent advection. No new body.
+Key change: chroma histogram over 8 seconds. Correlation under 0.6 triggers a 3 second hue lerp, a curl-force sweep, and a 20 percent water dump. Not a hard cut.
+
+================================================================================
+14. EXPORT (LOCKED)
+================================================================================
+Master: store sim params + seed + audio. Re-render offline, up to 4K. Do not store every sim frame as the master.
+Quick share: MediaRecorder of the display canvas only, 1080x1920, 30 fps, H.264 or H.265, about 8 Mbps, drop to 5 on memory pressure. Audio is the mic at -3 dB, optional light reverb, or muted.
+Still: highest luminance-variance frame by default. Scrub allowed. No filters.
+Sidecar JSON: key or null, duration, peak force time and value, peak impasto time and height, silence fraction, mood warmth and energy every 10 seconds, app version.
+Review screen: still, scrub, Export, Share. No editing tools.
+No multi-session layering in v1. A previous frame would need a restored height field. Out of scope.
+
+================================================================================
+15. BUILD ORDER
+================================================================================
+1. YIN or MPM, chroma, onset, RMS, centroid, AGC, pitch-jump rejection
+2. Gesture holder and force trail. No per-note dots.
+3. Force mapping table with clamps
+4. Sim at 270x480, three textures, one diffusion pass
+5. Impasto height, normal map, raking light
+6. Chromatic dark function with floors
+7. Mood vector
+8. Vocal flag, no height, no force direction
+9. Bloom, granulation, ghost layer, craze
+10. Quick-share recorder plus param/seed/audio master log
+
+================================================================================
+16. REJECTED — DO NOT REOPEN
+================================================================================
+- Note-to-color chart or fixed hex per pitch class
+- Pure black
+- 50/50 complements
+- One dot per note
+- Full Navier-Stokes
+- Voice curl or voice setting force direction
+- Touch sculpting, pinch, swipe, accelerometer shake
+- Starting palette picker
+- Painting over a previous session in v1
+- Square 256 sim grid
+- Unbounded force curve 0–2.5
+- Viscosity scale 0.70–1.30
+- Mood hue tilt of 20 degrees
+- MediaRecorder as the only export
+- Undefined memory layer from a missing addendum
+================================================================================
+END MASTER BRIEF

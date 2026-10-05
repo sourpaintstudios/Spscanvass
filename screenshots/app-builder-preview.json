@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Sour Paint Studios",
+      "hasCanvas": true,
+      "bodyTextLen": 166,
+      "bodyTextHash": "e92d86f8e85c422ca69ad7406808d93fd09afd87c602d18430504c2b60b1b20c",
+      "bodyTextPrefix": "DANIEL LEE SOUR PAINT STUDIOS Play it. The playing paints. Water",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Sour Paint Studios",
+      "hasCanvas": true,
+      "bodyTextLen": 166,
+      "bodyTextHash": "e92d86f8e85c422ca69ad7406808d93fd09afd87c602d18430504c2b60b1b20c",
+      "bodyTextPrefix": "DANIEL LEE SOUR PAINT STUDIOS Play it. The playing paints. Water",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

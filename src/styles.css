@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "@fontsource/outfit/400.css";
+@import "@fontsource/outfit/500.css";
+@import "@fontsource/outfit/600.css";
+@import "@fontsource/bebas-neue/400.css";
+
+@theme {
+  --color-background: #070807;
+  --color-elevated: #141814;
+  --color-foreground: #f3f6ea;
+  --color-muted: #a8b5a4;
+  --color-subtle: #8b987f;
+  --color-brand: #c6ff3d;
+  --color-signal: #f4ff6a;
+  --color-ink: #10140c;
+  --color-line: rgb(198 255 61 / 0.35);
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-display: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
+  --shadow-glow: 0 0 0 1px rgb(198 255 61 / 0.72), 0 0 22px rgb(198 255 61 / 0.28);
+}
+
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    color-scheme: dark;
+    background: var(--color-background);
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.45;
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    background: var(--color-brand);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  input,
+  textarea {
+    font: inherit;
+  }
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  line-height: 0.84;
+  font-size: clamp(2.55rem, 12.5vw, 5.25rem);
+}
+
+.track-brand {
+  letter-spacing: 0.22em;
+}
+
+.glow-rule {
+  height: 1px;
+  background: var(--color-brand);
+  box-shadow: 0 0 12px var(--color-brand);
+}
+
+.door-signal {
+  box-shadow: 0 0 0 1px rgb(244 255 106 / 0.6), 0 0 18px rgb(244 255 106 / 0.18);
+}
+
+.pb-safe {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.field {
+  height: 48px;
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--color-line);
+  background: var(--color-elevated);
+  color: var(--color-foreground);
+  padding: 0 16px;
+  font-size: 1rem;
+}
+
+.area {
+  width: 100%;
+  min-height: 50dvh;
+  border-radius: 12px;
+  border: 1px solid var(--color-line);
+  background: var(--color-elevated);
+  color: var(--color-foreground);
+  padding: 16px;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin-wheel {
+    transition: none !important;
+  }
+}

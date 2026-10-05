@@ -1,0 +1,89 @@
+# Sour Paint Studios Canvas — Build Spec
+
+## What it is
+Canvas is the art half of the Sour Paint Studios app. The Songbook (lyrics reader, tap-tempo, tuner) is the music half. Both live in ONE app. Sour Paint Studios is about art and music together, so this is one product, not two.
+
+Canvas is a perform-to-paint tool. The user plays guitar into the phone's mic, and their playing paints an expressionistic painting live on screen. The performance is the brush. The same song played tender and slow vs. angry and fast must produce clearly different paintings. Every painting is a one-of-a-kind fingerprint of that performance.
+
+## App structure
+- **Home screen:** two doors — **Songbook** and **Canvas**. Same Sour Paint Studios branding throughout (fluorescent green, lime green, fluorescent yellow, glow treatment on buttons and dividers).
+- **Canvas flow:** Gallery → New Painting → Setup → Play & Paint → Finish → Save/Share → back to Gallery.
+
+## 1. Gallery (Canvas landing screen)
+- Opens to the user's past paintings first, as a grid of thumbnails.
+- Prominent **New Painting** button.
+- Tap a painting to view it full screen, re-download the PNG, or replay/download its video.
+- Stored locally on the device (IndexedDB). Never lost on reload.
+
+## 2. Setup screen
+Four picks. **All are optional** — the user can skip any or all of them.
+
+| Pick | What it controls | Notes |
+|---|---|---|
+| **Style** | The *how*: medium, technique, brush behavior | ~50 options. Examples: watercolor, oil, alla prima, palette knife, gouache, ink wash, Bob Ross wet-on-wet, impasto, pastel, spray/street. |
+| **Genre** | The *world*: mood, composition, color world | Examples: Frazetta sci-fi/fantasy, rock poster art, album cover art, comic book art, landscape, abstract, desert/Southwest, cosmic. |
+| **Palette** | The colors | Picked with a **spinning color wheel**: user spins it, it ticks through the Sour Paint Studios palettes, slows down, lands on one. Lock button to keep, or spin again. |
+| **Subject** | The specific thing | Free-text box. "UFO", "my dog", "desert wolf". |
+
+Three ways in:
+1. **Fill it in** — choose any combination.
+2. **Skip** — leave picks blank, hit Start, use sensible defaults.
+3. **Get to the Jam** — one button that randomly picks Style, Genre, Palette, and Subject and starts immediately. Show the rolled combo briefly before painting begins.
+
+Also on setup: **length** — 30, 60, or 90 seconds (matches TikTok/Reels lengths), plus a manual **Done** button to finish early.
+
+## 3. Everything is EXPRESSIONISTIC
+- This is generative brushwork, not an AI image generator. It does not render realistic subjects.
+- A subject should read as an *expressionistic impression*. Example, "UFO": a glowing hovering disc of light, beams streaking downward, an eerie palette, sense of something hovering. The viewer's eye fills in the rest.
+- **Critical:** every Style and every Genre must look genuinely distinct. They must NOT all collapse into the same generic abstract swooshes. This was the main failure of the earlier tuner-painting test: the core mechanic worked and was responsive, but every result looked like the same long sweeping strokes regardless of how it was played.
+
+### How to make that work
+- **Style = a brush engine.** Each style is its own parameter set and mark vocabulary, not just a color swap. Watercolor: translucent, bleeding soft edges, pooling, low opacity layering. Alla prima / oil: thick opaque daubs, visible bristle texture, confident direction. Palette knife: flat hard-edged slabs. Ink wash: high contrast, wet spread, drips. Comic book: bold outlines, flat fills, halftone dots. Each style needs several distinct mark types (stroke, dab, splatter, drip, scrape, dot, glaze) with its own weighting.
+- **Genre = a composition recipe.** Where marks are allowed to land, which direction they flow, focal point placement, value structure. Landscape: horizon band, sky above, ground below, horizontal flow. Rock poster: centered symmetric focal form, radiating marks, high saturation. Frazetta: dramatic diagonal, dark masses against a bright focal light.
+- **Subject = a shape skeleton.** A small library of rough forms and composition hints keyed by keyword (disc, figure, tree, mountain, animal silhouette, sun, face, guitar, etc.). Unknown subjects fall back to the genre recipe, with the subject text seeding the randomness so the same word gives a consistent feel.
+- **Playing paints on top** of that skeleton. Subject sets the *what*, the playing sets the *how*.
+
+## 4. Painting engine — how playing becomes paint
+Use the Web Audio API on the live mic input.
+
+| What the guitar does | What it does to the painting |
+|---|---|
+| **Pitch** | Color. Low notes paint the deep/dark tones of the palette, high notes the bright tones. |
+| **Volume / attack** | Mark size and weight. Soft fingerpicking = thin, delicate strokes. Hard strumming = big, bold, splashy marks. |
+| **Tempo** | Pace. Fast playing floods the canvas with quick marks; slow playing lays them down gently and spaced out. |
+| **Rhythm / groove** | Mark *shape*, not just speed. Staccato/choppy = short punchy broken strokes. Smooth/flowing = long connected sweeps. A galloping rhythm leaves a galloping pattern. |
+| **Note** | Placement on the canvas, within the genre/subject composition. |
+| **Chord quality (major vs minor)** | Mood. Minor = sadder, softer, cooler, more muted ("sadness paint"). Major = brighter, warmer, more open. |
+
+Technical starting points:
+- Pitch: autocorrelation or YIN on the mic buffer.
+- Attack and rhythm: onset detection (spectral flux or energy jumps); inter-onset intervals give tempo and regularity.
+- Chord quality: chroma (12-bin pitch class) analysis; check for a major vs minor third above the detected root.
+- Smooth all values over short windows so the painting reacts musically, not jittery.
+
+### Ending a painting
+- Painting has a defined start and a defined end so it never overpaints into mud.
+- Ends when the timer runs out or the user taps Done. The piece locks as finished.
+
+## 5. Capture and output
+- **Record the painting live** while it paints (canvas.captureStream + MediaRecorder). The earlier tuner build already did this and it worked well — keep that approach.
+- When finished, the user gets **two downloads:**
+  1. **PNG image** — high definition, high quality. Render from a high-resolution offscreen canvas (scale by devicePixelRatio or larger), not a screenshot of the visible view.
+  2. **Video** of the painting creating itself.
+- Both saved to the gallery and downloadable / shareable.
+- Small "Sour Paint Studios" signature in the corner of the image and video, as in the earlier tests.
+
+## 6. Future (do not build yet)
+- Record the **audio of the song being played** into the video, so the video is the actual performance painting the actual art.
+- Push video directly to YouTube / TikTok / Instagram.
+- Order the painting on a print or t-shirt through sourpaintstudios.com via Printful.
+
+## Build order
+1. **Proof of concept:** one subject end to end — **UFO** — with two clearly different styles (e.g. watercolor vs. alla prima). Goal: prove the playing visibly changes the painting and the styles look truly different.
+2. Setup screen with all four optional picks, the spinning palette wheel, and Get to the Jam.
+3. Timer + Done, locking finished paintings.
+4. Gallery, PNG export, video recording and download.
+5. Expand styles toward ~50, more genres, more subject skeletons.
+
+## Testing
+The developer can confirm it runs and renders. The real test is a guitarist playing into it: same subject played two very different ways must produce two very different paintings.
